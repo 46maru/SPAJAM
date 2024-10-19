@@ -1,31 +1,25 @@
-import os
 import base64
-import pillow_heif
-import io
-
-from PIL.ExifTags import TAGS, GPSTAGS
-from openai import AzureOpenAI
+from io import BytesIO
 from PIL import Image
-from geopy.geocoders import Nominatim
+from PIL.ExifTags import TAGS
+import exif
 
 # Azure OpenAI設定
 client = AzureOpenAI(
-    api_key="01efc2d639a7464facdc50fc40407d9f",
     api_version="2024-05-01-preview",
     azure_endpoint="https://ssdl-gpt-4o.openai.azure.com/"
 )
 
-# GPS情報の抽出部分
 def get_gps_info(gps_info):
     gps_data = {}
-    for key in gps_info.keys():
-        decode = GPSTAGS.get(key, key)
-        gps_data[decode] = gps_info[key]
+    if gps_info:
+        for key in gps_info.keys():
+            decode = TAGS.get(key, key)
+            gps_data[decode] = gps_info[key]
     return gps_data
 
 # 画像ファイルのmeta dataを抽出
-def get_image_metadata(image_path):
-    image = Image.open(image_path)
+def get_image_metadata_deco(image):
     exif_data = {}
     if hasattr(image, '_getexif'):
         exif = image._getexif()
@@ -39,7 +33,7 @@ def get_image_metadata(image_path):
     return exif_data
 
 # 画像のパス メタデータの辞書 を引数に持って1つに固める関数
-def convert_to_image_data(img_path, metadata):
+def convert_to_image_data_deco(image, metadata):
     # 緯度の変換
     try:
         lat = metadata['GPSInfo']['GPSLatitude']
@@ -60,13 +54,14 @@ def convert_to_image_data(img_path, metadata):
 
     # 変換後のデータ構造
     image_data = {
-        'image_path': img_path,
+        'image_path': "",
         'metadata': {
             '緯度': lat,
             '経度': lon,
             '撮影日時': date_time
         }
     }
+    print(image_data)
     return image_data
 
 # 緯度経度から住所を特定
@@ -98,15 +93,9 @@ def encode_image(image_path):
         return base64.b64encode(image_file.read()).decode('utf-8')
 
 # 画像分析
-def analyze_multiple_images(image_paths):
+def analyze_multiple_images(base64_images):
     image_contents = []
-    for image_path in image_paths:
-        base64_image = encode_image(image_path)
-        metadata = get_image_metadata(image_path)
-        image_data = convert_to_image_data(image_path, metadata)
-
-        prefecture, city, place, name = get_location_info(image_data['metadata']['緯度'], image_data['metadata']['経度'])
-        
+    for base64_image in base64_images:
         image_contents.append({
             "type": "image_url",
             "image_url": {
@@ -114,23 +103,36 @@ def analyze_multiple_images(image_paths):
             }
         })
 
-        image_contents.append({
-            "type": "text",
-            "text": f"""
-            撮影日時: {image_data['metadata']['撮影日時']}
-            位置情報: {prefecture} {city} {place}
-            場所名：{name}
-            """
-        })
-
     prompt = f"""
-    これらの{len(image_paths)}枚の写真とそれぞれのメタデータを分析してください。
-    各写真について以下の点を説明し、最後に全体的な幸福度を評価してください：
-    1. 各写真に写っている主な要素や場面
-    2. それぞれの写真から感じ取れる幸せな出来事や感情
-    3. 撮影時期や場所の特徴とそれが幸福感にどう影響しているか
+    以下の{len(base64_images)}枚の写真とそれぞれのメタデータを分析し、総合的な幸福度を評価してください。
 
-    最後に、これらの写真全体から読み取れる幸福度を10段階で評価し、その理由を説明してください。
+    各写真について以下の点を分析してください：
+    1. 主要な視覚要素（人物、風景、物体など）
+    2. 写真から感じ取れる雰囲気や感情
+    3. 撮影時期・場所の特徴とその意義
+    4. メタデータ（撮影日時、位置情報、場所名、緯度、経度）の考慮
+
+    全体的な分析：
+    1. 写真間の関連性や時系列の変化
+    2. 共通するテーマや要素
+    3. 環境や背景の多様性とその影響
+
+    幸福度の評価（100%スケール）において、以下の要素を考慮してください：
+    - 人物の表情や姿勢
+    - 環境や背景の快適さ
+    - 活動や行動の種類
+    - 社会的つながりの存在
+    - 季節や天候の影響
+
+    結論：
+    1. 総合的な幸福度を100%スケールで評価してください。
+    2. 幸福度判断の根拠を3点以上、簡潔に述べてください。
+    3. 写真全体から読み取れる生活の質や満足度について、簡潔に考察してください。
+
+    注意事項：
+    - 各要素がどのように幸福度に寄与しているか、具体的に説明してください。
+    - 時間経過による変化や成長、場所や環境の影響を考慮してください。
+    - 分析は簡潔かつ的確に行い、冗長な説明は避けてください。    
     """
 
     messages = [
@@ -143,16 +145,20 @@ def analyze_multiple_images(image_paths):
     response = client.chat.completions.create(
         model="ssdl-gpt-4o",
         messages=messages,
-        max_tokens=500 * len(image_paths)
+        max_tokens=500 * len(base64_images)
     )
 
     print("分析結果:")
     print(response.choices[0].message.content)
 
 if __name__ == "__main__":
-    image_paths = [
-        "/content/drive/MyDrive/ハッカソン/sample_img1.JPG",
-        "/content/drive/MyDrive/ハッカソン/sample_img2.jpg"
+    base64_images = [
+        """
+        ここにbase64
+        """,
+        """
+        ここにbase64
+        """
     ]
 
-    analyze_multiple_images(image_paths)
+    analyze_multiple_images(base64_images)

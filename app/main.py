@@ -8,6 +8,11 @@ from typing import List
 from datetime import datetime
 from fastapi.responses import JSONResponse
 import base64
+from PIL import Image
+from PIL.ExifTags import TAGS, GPSTAGS
+import io
+import exif
+from 
 
 app = FastAPI(debug=True)
 router = APIRouter()
@@ -34,12 +39,16 @@ def get_image(db: Session = Depends(get_db)):
 async def create_image(file: UploadFile = File(...), db: Session = Depends(get_db)):
     contents = await file.read()
     encoded_image = base64.b64encode(contents).decode('utf-8')
+    latitude, longitude = get_gps_from_image(contents)
     image = Images(image_path=encoded_image, created_at=datetime.now(), updated_at=datetime.now())
     db.add(image)
     db.commit()
     db.refresh(image)
-    return image
+    return contents
 
+@router.get('/api/happiness')
+async def get_happiness(image_paths: List[str]):
+    pass
 
 app.include_router(router)
 
