@@ -1,7 +1,13 @@
-from fastapi import APIRouter, FastAPI
+from fastapi import APIRouter, FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
+from models.images import Images
+from schemes.images import ImageListResponse
+from database import get_db
+from typing import List
+from datetime import datetime
 
-app = FastAPI()
+app = FastAPI(debug=True)
 router = APIRouter()
 
 origins = ["localhost"]
@@ -16,6 +22,13 @@ app.add_middleware(
 @router.get('/check')
 def check():
     return {"message": "Hello, FastAPI!"}
+
+@router.get('/api/image', response_model=ImageListResponse)
+def get_image(db: Session = Depends(get_db)):
+    images = db.query(Images).all()
+    return ImageListResponse(results=images)
+
+
 
 app.include_router(router)
 
