@@ -20,3 +20,14 @@ class ImageListResponse(BaseModel):
     
     class Config:
         orm_mode = True
+        
+class ImageCreateRequest(BaseModel):
+    image_path: str
+    latitude: float
+    longitude: float
+    happiness_point: int
+    happiness_text: str
+    created_at: datetime
+
+    class Config:
+        orm_mode = True
