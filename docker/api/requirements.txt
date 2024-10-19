@@ -1,0 +1,7 @@
+alembic==1.11.1
+fastapi==0.99.1
+mysqlclient==2.1.1
+pydantic==1.10.11
+python-dotenv==1.0.0
+SQLAlchemy==2.0.18
+uvicorn==0.22.0

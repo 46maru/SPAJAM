@@ -1,0 +1,43 @@
+services:
+    db:  
+        build:
+            context: .
+            dockerfile: ./docker/db/Dockerfile
+        ports:
+            - 3309:3306
+        environment:
+            MYSQL_DATABASE: hosonolab
+            MYSQL_ROOT_PASSWORD: attk1010
+            MYSQL_PASSWORD: attk1010
+            MYSQL_USER: dbuser
+            TZ: 'Asia/Tokyo'
+        volumes:
+        - mysql-volume:/var/lib/mysql
+        networks:
+        - backend
+
+    fastapi:
+        build:
+            context: ./docker/api
+            dockerfile: Dockerfile
+        container_name: fastapi
+        environment:
+            PYTHONPATH: /workspace/app
+        volumes:
+            - ./app:/workspace/app
+            - ./scripts:/workspace/scripts
+            - ./.env:/workspace/.env
+        working_dir: /workspace
+        command: bash -c "./scripts/run.sh"
+        ports:
+            - 8000:8000
+        depends_on:
+            - db
+        networks:
+            - backend
+
+networks:
+    backend:
+
+volumes:
+    mysql-volume:
