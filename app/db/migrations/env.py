@@ -8,6 +8,7 @@ from alembic import context
 from database import Base  
 from env import DB_HOST, DB_NAME, DB_PASSWORD, DB_USER  
 import models.test_items  
+import models.images
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
