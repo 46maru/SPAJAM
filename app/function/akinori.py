@@ -3,9 +3,11 @@ from io import BytesIO
 from PIL import Image
 from PIL.ExifTags import TAGS
 import exif
+from openai import AzureOpenAI
 
 # Azure OpenAI設定
 client = AzureOpenAI(
+    api_key="01efc2d639a7464facdc50fc40407d9f",
     api_version="2024-05-01-preview",
     azure_endpoint="https://ssdl-gpt-4o.openai.azure.com/"
 )
@@ -17,6 +19,54 @@ def get_gps_info(gps_info):
             decode = TAGS.get(key, key)
             gps_data[decode] = gps_info[key]
     return gps_data
+
+
+# 画像ファイルのmeta dataを抽出
+def get_image_metadata(image_path):
+    image = Image.open(image_path)
+    exif_data = {}
+    if hasattr(image, '_getexif'):
+        exif = image._getexif()
+        if exif:
+            for tag_id, value in exif.items():
+                tag = TAGS.get(tag_id, tag_id)
+                if tag == 'GPSInfo':
+                    exif_data[tag] = get_gps_info(value)
+                elif tag == 'DateTime':
+                    exif_data[tag] = value
+    return exif_data
+
+# 画像のパス メタデータの辞書 を引数に持って1つに固める関数
+def convert_to_image_data(img_path, metadata):
+    # 緯度の変換
+    try:
+        lat = metadata['GPSInfo']['GPSLatitude']
+    except:
+        lat = ""
+
+    # 経度の変換
+    try:
+        lon = metadata['GPSInfo']['GPSLongitude']
+    except:
+        lon = ""
+
+    # 撮影日時の取得
+    try:
+        date_time = metadata['DateTime']
+    except:
+        date_time = ""
+
+    # 変換後のデータ構造
+    image_data = {
+        'image_path': img_path,
+        'metadata': {
+            '緯度': lat,
+            '経度': lon,
+            '撮影日時': date_time
+        }
+    }
+    return image_data
+
 
 # 画像ファイルのmeta dataを抽出
 def get_image_metadata_deco(image):
