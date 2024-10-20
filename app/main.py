@@ -14,6 +14,7 @@ import io
 import exif
 from function.akinori import get_image_metadata, convert_to_image_data, analyze_multiple_images
 from openai import AzureOpenAI
+import json
 
 
 app = FastAPI(debug=True)
@@ -100,13 +101,20 @@ async def get_happiness(db: Session = Depends(get_db)):
     for image in today_images:
         base64_images.append(image.image_path)
         
-    # 画像分析を実行
+    #画像分析を実行
     if base64_images:
         analysis_result = analyze_multiple_images(base64_images)
     else:
         analysis_result = "本日の画像がありません。"
     
-    return base64_images
+    data = json.loads(analysis_result)
+    # 新しい形式に変換
+    output_data = {
+        'score': data['score'],
+        'comment': data['comments']
+    }
+    
+    return output_data
 
 app.include_router(router)
 

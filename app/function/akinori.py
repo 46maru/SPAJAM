@@ -4,12 +4,13 @@ from PIL import Image
 from PIL.ExifTags import TAGS
 import exif
 from openai import AzureOpenAI
+import zlib
 
 # Azure OpenAI設定
 client = AzureOpenAI(
-    api_key="01efc2d639a7464facdc50fc40407d9f",
+    api_key="",
     api_version="2024-05-01-preview",
-    azure_endpoint="https://ssdl-gpt-4o.openai.azure.com/"
+    azure_endpoint=""
 )
 
 def get_gps_info(gps_info):
@@ -145,6 +146,8 @@ def encode_image(image_path):
 # 画像分析
 def analyze_multiple_images(base64_images):
     image_contents = []
+    zip_base64_images = []
+    
     for base64_image in base64_images:
         image_contents.append({
             "type": "image_url",
@@ -153,19 +156,17 @@ def analyze_multiple_images(base64_images):
             }
         })
 
-    prompt = f"""
-    以下の{len(base64_images)}枚の写真とそれぞれのメタデータを分析し、総合的な幸福度を評価してください。
+    prompt = f'''
+    以下の{len(base64_images)}枚の写真とそれぞれのメタデータを分析し、下記観点から総合的な幸福度を評価し300字以内でまとめてください。
 
     各写真について以下の点を分析してください：
     1. 主要な視覚要素（人物、風景、物体など）
     2. 写真から感じ取れる雰囲気や感情
     3. 撮影時期・場所の特徴とその意義
-    4. メタデータ（撮影日時、位置情報、場所名、緯度、経度）の考慮
 
     全体的な分析：
-    1. 写真間の関連性や時系列の変化
-    2. 共通するテーマや要素
-    3. 環境や背景の多様性とその影響
+    1. 共通するテーマや要素
+    2. 環境や背景の多様性とその影響
 
     幸福度の評価（100%スケール）において、以下の要素を考慮してください：
     - 人物の表情や姿勢
@@ -176,14 +177,21 @@ def analyze_multiple_images(base64_images):
 
     結論：
     1. 総合的な幸福度を100%スケールで評価してください。
-    2. 幸福度判断の根拠を3点以上、簡潔に述べてください。
+    2. 幸福度判断の根拠を3点、簡潔に述べてください。
     3. 写真全体から読み取れる生活の質や満足度について、簡潔に考察してください。
 
     注意事項：
     - 各要素がどのように幸福度に寄与しているか、具体的に説明してください。
     - 時間経過による変化や成長、場所や環境の影響を考慮してください。
     - 分析は簡潔かつ的確に行い、冗長な説明は避けてください。    
-    """
+    
+    出力形式：
+    以下のような形式で出力して下さい．
+    例)
+        {{"comments" : ["今日も良い日でした", "最高です", "楽しいです"], "score", 95}}
+
+    これ以外は出力しないで下さい．
+    '''
 
     messages = [
         {
@@ -195,11 +203,11 @@ def analyze_multiple_images(base64_images):
     response = client.chat.completions.create(
         model="ssdl-gpt-4o",
         messages=messages,
-        max_tokens=500 * len(base64_images)
+        # max_tokens=500 * len(base64_images)
+        max_tokens=500
     )
-
-    print("分析結果:")
-    print(response.choices[0].message.content)
+    
+    return response.choices[0].message.content
 
 if __name__ == "__main__":
     base64_images = [
