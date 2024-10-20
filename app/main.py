@@ -82,6 +82,16 @@ async def create_image(file: UploadFile = File(...), db: Session = Depends(get_d
         if os.path.exists("temp_image.jpg"):
             os.remove("temp_image.jpg")
 
+@router.delete('/api/image/{image_id}')
+def delete_image(image_id: int, db: Session = Depends(get_db)):
+    # データベースから指定されたIDの画像を取得
+    image = db.query(Images).filter(Images.id == image_id).first()
+    
+    # 画像をデータベースから削除
+    db.delete(image)
+    db.commit()
+    return {"message": f"Image with id {image_id} has been successfully deleted"}
+    
 @router.get('/api/happiness')
 async def get_happiness(db: Session = Depends(get_db)):
     # 今日の日付を取得
